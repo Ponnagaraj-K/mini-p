@@ -1,0 +1,30 @@
+# Weight files (too large for GitHub)
+weights/*.pt
+weights/*.pth
+
+# Keep sample images and structure
+!weights/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Virtual environment
+venv/
+env/
+
+# Streamlit cache
+.streamlit/
+
+# Temp files
+*.tmp
+*.log
+analyze_sample.py
+test_enhance.py
+extract_weights.py
+
+# Large data files
+*.zip
+*.tar.gz
