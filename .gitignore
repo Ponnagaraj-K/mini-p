@@ -28,3 +28,17 @@ extract_weights.py
 # Large data files
 *.zip
 *.tar.gz
+
+# Generated PDF reports
+reports/*.pdf
+
+# Claude AI settings
+.claude/
+
+# YOLOv8 base model
+yolov8n.pt
+
+# Training data directories inside weights
+weights/data/
+weights/my_outputs/
+weights/weights_download/

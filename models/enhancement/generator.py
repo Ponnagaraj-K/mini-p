@@ -41,11 +41,24 @@ class ChannelAttention(nn.Module):
         return x * y
 
 
+class ResidualDenoiseBlock(nn.Module):
+    """Residual denoising block for edge preservation"""
+    def __init__(self, channels):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, 3, 1, 1),
+            nn.ReLU(),
+            nn.Conv2d(channels, channels, 3, 1, 1)
+        )
+
+    def forward(self, x):
+        return x + 0.1 * self.block(x)
+
+
 class UNetGenerator(nn.Module):
     """
     U-Net based generator for underwater image enhancement.
-    Architecture: Encoder -> Bottleneck -> Decoder with skip connections.
-    Designed for FUnIE-GAN style enhancement targeting haze, color shift, and scatter.
+    Enhanced with: Color correction (ChannelAttention) + Denoising (ResidualBlocks) + Edge preservation
     """
     def __init__(self, in_channels=3, out_channels=3, features=64):
         super().__init__()
@@ -59,17 +72,22 @@ class UNetGenerator(nn.Module):
         # Channel attention for color correction
         self.attention = ChannelAttention(features * 8)
 
-        # Bottleneck
+        # Bottleneck with denoising
         self.bottleneck = nn.Sequential(
             nn.Conv2d(features * 8, features * 8, 4, 2, 1),
-            nn.ReLU()
+            nn.ReLU(),
+            ResidualDenoiseBlock(features * 8)
         )
 
-        # Decoder with skip connections
+        # Decoder with skip connections + denoising
         self.dec1 = ConvBlock(features * 8, features * 8, down=False, dropout=True)          # 16
+        self.denoise1 = ResidualDenoiseBlock(features * 8)
         self.dec2 = ConvBlock(features * 8 * 2, features * 4, down=False, dropout=True)      # 32
+        self.denoise2 = ResidualDenoiseBlock(features * 4)
         self.dec3 = ConvBlock(features * 4 * 2, features * 2, down=False)                    # 64
+        self.denoise3 = ResidualDenoiseBlock(features * 2)
         self.dec4 = ConvBlock(features * 2 * 2, features, down=False)                        # 128
+        self.denoise4 = ResidualDenoiseBlock(features)
 
         # Output layer
         self.output = nn.Sequential(
@@ -84,17 +102,17 @@ class UNetGenerator(nn.Module):
         e3 = self.enc3(e2)
         e4 = self.enc4(e3)
 
-        # Attention on deep features
+        # Attention on deep features for color correction
         e4 = self.attention(e4)
 
-        # Bottleneck
+        # Bottleneck with denoising
         b = self.bottleneck(e4)
 
-        # Decoding with skip connections
-        d1 = self.dec1(b)
-        d2 = self.dec2(torch.cat([d1, e4], dim=1))
-        d3 = self.dec3(torch.cat([d2, e3], dim=1))
-        d4 = self.dec4(torch.cat([d3, e2], dim=1))
+        # Decoding with skip connections + denoising for edge preservation
+        d1 = self.denoise1(self.dec1(b))
+        d2 = self.denoise2(self.dec2(torch.cat([d1, e4], dim=1)))
+        d3 = self.denoise3(self.dec3(torch.cat([d2, e3], dim=1)))
+        d4 = self.denoise4(self.dec4(torch.cat([d3, e2], dim=1)))
 
         return self.output(torch.cat([d4, e1], dim=1))
 

@@ -64,7 +64,7 @@ class EnhancementLoss(nn.Module):
     - SSIM loss: maintains structural integrity
     - L1 loss: pixel-level accuracy
     """
-    def __init__(self, lambda_perceptual=10.0, lambda_ssim=5.0, lambda_l1=100.0):
+    def __init__(self, lambda_perceptual=5.0, lambda_ssim=10.0, lambda_l1=150.0):
         super().__init__()
         self.perceptual = PerceptualLoss()
         self.ssim = SSIMLoss()

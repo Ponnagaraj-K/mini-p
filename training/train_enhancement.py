@@ -15,6 +15,7 @@ import os
 import sys
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from datetime import datetime
 
 # Add project root to path (adjust for Kaggle)
 sys.path.append("/kaggle/working/underwater-enhancement")
@@ -120,9 +121,16 @@ def train(config: dict):
     history = {"g_loss": [], "d_loss": [], "epoch": []}
     save_dir = Path(config["save_dir"])
     save_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Log file for weight tracking
+    log_file = save_dir / "weight_updates.log"
+    def log_update(msg):
+        with open(log_file, "a") as f:
+            f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
 
     print(f"\nStarting training: {config['epochs']} epochs | "
           f"{len(dataset)} samples | batch size {config['batch_size']}")
+    log_update(f"Training started - Config: {config}")
 
     for epoch in range(start_epoch, config["epochs"]):
         generator.train()
@@ -176,15 +184,20 @@ def train(config: dict):
                 "opt_g": opt_g.state_dict(),
                 "opt_d": opt_d.state_dict(),
                 "best_g_loss": best_g_loss,
+                "g_loss": avg_g,
+                "d_loss": avg_d,
                 "config": config
             }, ckpt_path)
-            print(f"Checkpoint saved: {ckpt_path}")
+            print(f"✅ Checkpoint saved: {ckpt_path}")
+            log_update(f"Checkpoint E{epoch+1}: G_loss={avg_g:.6f} (size: {os.path.getsize(ckpt_path)/(1024**2):.1f}MB)")
 
         # Save best model
         if avg_g < best_g_loss:
             best_g_loss = avg_g
-            torch.save(generator.state_dict(), save_dir / "best_generator.pt")
-            print(f"Best model saved (G_loss: {best_g_loss:.4f})")
+            best_path = save_dir / "best_generator.pt"
+            torch.save(generator.state_dict(), best_path)
+            print(f"🏆 Best model saved — G_loss: {best_g_loss:.4f}")
+            log_update(f"BEST_MODEL Updated E{epoch+1}: G_loss={best_g_loss:.6f} (size: {os.path.getsize(best_path)/(1024**2):.1f}MB)")
 
     # Save final model
     torch.save(generator.state_dict(), save_dir / "final_generator.pt")
@@ -214,18 +227,18 @@ def train(config: dict):
 
 if __name__ == "__main__":
     config = {
-        # Kaggle paths — adjust based on your dataset setup
-        "degraded_dir": "/kaggle/working/IOD-Syn/degraded",
-        "clean_dir": "/kaggle/working/IOD-Syn/clean",
-        "save_dir": "/kaggle/working/models",
-        "resume_from": None,        # Set path to resume training
+        # Local paths
+        "degraded_dir": "e:/mini project/underwater-enhancement/data/degraded",
+        "clean_dir":    "e:/mini project/underwater-enhancement/data/clean",
+        "save_dir":     "e:/mini project/underwater-enhancement/weights",
+        "resume_from":  "e:/mini project/underwater-enhancement/weights/checkpoint_epoch_65.pt",
 
         # Training hyperparameters
-        "epochs": 100,
-        "batch_size": 8,            # Fits T4 16GB GPU
-        "lr": 0.0002,
+        "epochs": 150,
+        "batch_size": 8,
+        "lr": 0.00005,
         "image_size": 256,
-        "save_every": 10,           # Save checkpoint every N epochs
+        "save_every": 5,
     }
 
     # Step 1: Generate synthetic dataset if not already done

@@ -19,10 +19,12 @@ def compute_uiqm(image: np.ndarray) -> float:
     No reference image needed — works on real-world footage.
     """
     img = image.astype(np.float32) / 255.0
+    # OpenCV is BGR: index 2=R, 1=G, 0=B
+    r, g, b = img[:, :, 2], img[:, :, 1], img[:, :, 0]
 
     # UICM - Underwater Image Colorfulness Measure
-    rg = img[:, :, 0] - img[:, :, 1]
-    yb = 0.5 * (img[:, :, 0] + img[:, :, 1]) - img[:, :, 2]
+    rg = r - g
+    yb = 0.5 * (r + g) - b
     uicm = -0.0268 * np.sqrt(np.mean(rg**2) + np.mean(yb**2)) + \
             0.1586 * np.sqrt(np.std(rg)**2 + np.std(yb)**2)
 
@@ -30,7 +32,7 @@ def compute_uiqm(image: np.ndarray) -> float:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-    uism = np.mean(np.sqrt(sobelx**2 + sobely**2))
+    uism = np.mean(np.sqrt(sobelx**2 + sobely**2)) / 255.0
 
     # UIConM - Underwater Image Contrast Measure
     uiconm = np.std(gray.astype(np.float32) / 255.0)

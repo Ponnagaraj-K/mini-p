@@ -34,35 +34,6 @@ INDIAN_OCEAN_PARAMS = {
 }
 
 
-def reduce_white_light_dominance(image: np.ndarray) -> np.ndarray:
-    """
-    Reduce white light dominance using local tone mapping.
-    Compresses bright regions (>220 brightness) by 35%.
-    """
-    img_float = image.astype(np.float32) / 255.0
-    
-    # Detect bright regions (white light > 220 = 0.86 normalized)
-    brightness = np.mean(img_float, axis=2)
-    bright_mask = (brightness > 0.86).astype(np.uint8)
-    
-    # Dilate and blur mask for smooth transitions
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
-    bright_mask = cv2.dilate(bright_mask, kernel, iterations=2)
-    bright_mask_soft = cv2.GaussianBlur(bright_mask.astype(np.float32), (31, 31), 0) / 255.0
-    
-    # Apply tone mapping: compress bright regions
-    result = img_float.copy()
-    for c in range(3):
-        # Get bright component (everything above 0.86)
-        bright_component = np.maximum(img_float[:,:,c] - 0.86, 0) / (1.0 - 0.86 + 1e-6)
-        # Map bright component to lower range: 0.86 + 0.2*bright_component = 0.86-1.0 becomes 0.86-0.98
-        compressed = np.minimum(img_float[:,:,c], 0.86) + bright_component * 0.2
-        # Blend using soft mask
-        result[:,:,c] = img_float[:,:,c] * (1 - bright_mask_soft) + compressed * bright_mask_soft
-    
-    return (result * 255).astype(np.uint8)
-
-
 def physics_white_balance(image: np.ndarray, region: str = "bay_of_bengal") -> np.ndarray:
     """
     Adaptive white balance — corrects dominant color cast toward neutral gray.
@@ -206,7 +177,7 @@ class EnhancementPipeline:
 
     def enhance(self, image: np.ndarray, apply_sr: bool = False) -> dict:
         """
-        Full enhancement pipeline with white light dominance reduction.
+        Full enhancement pipeline with honest reporting at each step.
         Returns enhanced image + detailed processing report.
         """
         report = {"steps": {}, "warnings": [], "success": True}
@@ -233,14 +204,7 @@ class EnhancementPipeline:
             current = cv2.LUT(current, lut)
             report["steps"]["neural_enhancement"] = "CLAHE + Color correction"
 
-        # Step 2: Reduce white light dominance (NEW)
-        try:
-            current = reduce_white_light_dominance(current)
-            report["steps"]["white_light_reduction"] = "SUCCESS — tone mapping compression applied"
-        except Exception as e:
-            report["steps"]["white_light_reduction"] = f"PARTIAL — {str(e)}"
-
-        # Step 3: Blend neural output with original to prevent artifacts
+        # Step 2: Blend neural output with original to prevent artifacts
         try:
             orig_float = image.astype(np.float32)
             enh_float = current.astype(np.float32)
@@ -263,10 +227,10 @@ class EnhancementPipeline:
         except Exception as e:
             report["steps"]["white_balance"] = f"FAILED — {str(e)}"
 
-        # Step 4: Skip haze removal — neural model handles this
+        # Step 3: Skip haze removal — neural model handles this
         report["steps"]["haze_removal"] = "SKIPPED — neural model handles dehazing"
 
-        # Step 5: Super resolution (optional, for detail recovery)
+        # Step 4: Super resolution (optional, for detail recovery)
         sr_image = None
         if apply_sr and self.use_sr:
             try:
@@ -278,7 +242,7 @@ class EnhancementPipeline:
         else:
             report["steps"]["super_resolution"] = "SKIPPED — Not requested or weights not loaded"
 
-        # Step 6: Mild sharpening
+        # Step 5: Mild sharpening
         kernel = np.array([[0, -0.3, 0], [-0.3, 2.2, -0.3], [0, -0.3, 0]])
         current = cv2.filter2D(current, -1, kernel)
         report["steps"]["sharpening"] = "SUCCESS"

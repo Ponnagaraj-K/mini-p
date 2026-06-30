@@ -104,13 +104,24 @@ def get_threat_style(threat_level: str) -> str:
 
 
 def display_quality_metrics(metrics: dict):
-    cols = st.columns(4)
-    uiqm_delta = metrics.get("uiqm_improvement", 0)
-    cols[0].metric("UIQM Before", f"{metrics.get('uiqm_before', 0):.3f}", help="Underwater Image Quality Measure (no reference needed)")
-    cols[1].metric("UIQM After", f"{metrics.get('uiqm_after', 0):.3f}",
+    uiqm_before = metrics.get('uiqm_before', 0) or 0
+    uiqm_after  = metrics.get('uiqm_after', 0) or 0
+    uiqm_delta  = metrics.get('uiqm_improvement', 0) or 0
+    uciqe_before = metrics.get('uciqe_before', 0) or 0
+    uciqe_after  = metrics.get('uciqe_after', 0) or 0
+    uciqe_delta  = metrics.get('uciqe_improvement', 0) or 0
+
+    cols = st.columns(6)
+    cols[0].metric("UIQM Before",  f"{uiqm_before:.3f}",  help="Underwater Image Quality Measure")
+    cols[1].metric("UIQM After",   f"{uiqm_after:.3f}",
                    delta=f"+{uiqm_delta:.3f}" if uiqm_delta > 0 else f"{uiqm_delta:.3f}")
-    cols[2].metric("PSNR (dB)", str(metrics.get("psnr", "N/A")), help="Requires reference image")
-    cols[3].metric("SSIM", str(metrics.get("ssim", "N/A")), help="Requires reference image")
+    cols[2].metric("UCIQE Before", f"{uciqe_before:.3f}", help="Underwater Color Image Quality")
+    cols[3].metric("UCIQE After",  f"{uciqe_after:.3f}",
+                   delta=f"+{uciqe_delta:.3f}" if uciqe_delta > 0 else f"{uciqe_delta:.3f}")
+    psnr_val = metrics.get('psnr')
+    ssim_val = metrics.get('ssim')
+    cols[4].metric("PSNR (dB)", f"{psnr_val:.2f}" if psnr_val else "N/A", help="Requires reference image")
+    cols[5].metric("SSIM",      f"{ssim_val:.4f}" if ssim_val else "N/A", help="Requires reference image")
 
     verdict = metrics.get("enhancement_verdict", "")
     if "EXCELLENT" in verdict or "GOOD" in verdict:
